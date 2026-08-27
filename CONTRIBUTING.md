@@ -25,7 +25,9 @@ fix(behavior): cancel follow action on timeout
 
 - 说明关联的需求编号和测试编号。
 - 运行 `python tools/validate_test_structure.py`。
+- 运行 `python tools/run_unit_tests.py`。
 - 行为变化必须补充或更新测试。
+- 新增能力按 `docs/testing/INCREMENTAL_TESTING.md` 分配新需求 ID，并执行影响范围回归。
 - 真机测试必须附带设备型号、固件版本、接口版本和结果摘要。
 - 安全相关修改至少需要一名非作者复核。
 

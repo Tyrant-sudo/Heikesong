@@ -10,4 +10,4 @@
 6. `fixtures/`：测试数据说明与小型合成样本。
 7. `reports/`：生成的测试结果。
 
-新增测试前，先在 `docs/testing/TRACEABILITY.md` 中确认关联需求和稳定测试编号。
+新增测试前，先在 `docs/testing/TRACEABILITY.md` 中分配需求编号，再按 `docs/testing/INCREMENTAL_TESTING.md` 确定回归范围。执行结果使用 `docs/testing/forms/` 中的表单，生成物放入被忽略的 `tests/reports/`。

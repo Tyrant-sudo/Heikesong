@@ -26,6 +26,11 @@ Thumbs.db
 /tests/reports/*
 !/tests/reports/.gitkeep
 
+# ROS/colcon generated workspaces and logs
+/build/
+/install/
+/log/
+
 # Raw media, sensor dumps, models, and hardware logs should use external storage
 /tests/fixtures/**/*.mp4
 /tests/fixtures/**/*.mov

@@ -21,3 +21,6 @@ jobs:
 
       - name: Validate V1 test structure
         run: python tools/validate_test_structure.py
+
+      - name: Run unit tests
+        run: python tools/run_unit_tests.py

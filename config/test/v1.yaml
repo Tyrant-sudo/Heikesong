@@ -1,4 +1,4 @@
-version: "0.1.0"
+version: "0.2.0"
 
 environment:
   default: SIM-MOCK
@@ -10,17 +10,41 @@ environment:
 
 execution:
   main_flow_consecutive_passes: 10
-  action_timeout_seconds: null       # 按动作和厂商接口分别确认
-  connection_loss_timeout_ms: null   # 必须由厂商安全资料确认
+  action_timeout_seconds: null        # 按动作和厂商接口分别确认
+  connection_loss_timeout_ms: null    # 必须由厂商安全资料确认
 
 perception:
-  person_confidence: null            # 使用验证集确定
-  pose_confidence: null              # 使用验证集确定
-  gesture_hold_seconds: null         # 通过误触发/漏触发测试确定
+  mat_confidence: null                # 使用标注验证集确定
+  mat_center_error_px: null           # 依输入分辨率和标定确定
+  mat_boundary_iou: null              # 使用标注验证集确定
+  mat_loss_timeout_ms: null           # 结合帧率与运动风险确定
+  user_confidence: null               # 使用验证集确定
+  user_position_error_m: null         # 依相机标定与场地确定
+  user_loss_timeout_ms: null          # 结合停止策略确定
+  downward_dog_confidence: null       # 使用正负姿态验证集确定
+  downward_dog_hold_seconds: null     # 通过误触发/漏触发测试确定
+  pose_reset_seconds: null            # 离开姿态后的复位条件
+
+behavior:
+  orbit_clearance_m: null             # 与垫边的批准距离
+  orbit_completion_tolerance_m: null  # 一圈完成判断
+  direction_deadband_deg: null        # 抑制方向抖动
+  direction_hold_seconds: null        # 方向稳定后才更新
+  follow_distance_m: null             # 厂商和场地批准值
+  pose_action_cooldown_seconds: null  # 同一姿势会话禁止重复触发
+
+timer:
+  default_duration_seconds: null      # 由具体测试批次填写
+  allowed_error_seconds: null         # 现场计时验收阈值
+
+camera:
+  photo_sharpness_threshold: null     # 由样本和分辨率校准
+  photo_user_in_frame_required: true
 
 safety:
-  human_stop_distance_m: null        # 禁止未经批准直接用于真机
-  maximum_test_speed_mps: null       # 由厂商安全限制和场地批准确定
+  human_stop_distance_m: null         # 禁止未经批准直接用于真机
+  maximum_test_speed_mps: null        # 由厂商安全限制和场地批准确定
+  motion_stop_timeout_ms: null        # 必须由厂商资料与受控实测批准
   operator_emergency_stop_required: true
   safety_observer_required: true
 

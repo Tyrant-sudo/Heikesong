@@ -1,0 +1,1 @@
+batch_id,test_date,timezone,case_id,subcase,dataset_or_scene,iteration,git_sha,app_version,model_version,config_version,device_model,edition,firmware,sdk,environment,expected,actual,status,metric,evidence_ref,defect_id,executor,reviewer

@@ -1,0 +1,1 @@
+"""Safety supervision contracts."""
