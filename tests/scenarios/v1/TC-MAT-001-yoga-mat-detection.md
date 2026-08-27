@@ -27,6 +27,16 @@
 - `detected=false` 时不输出可用于运动规划的陈旧边界。
 - 每条结果可追溯到输入帧、模型版本和时间戳。
 
+## 识别失败兜底（最低改动）
+
+在本地测试环境允许的情况下，若连续 20 帧 `detected=false`（或置信度长期低于阈值），立即转入微调采集，禁止继续发送环绕/跟随运动命令：
+
+- 使用最近失败帧构建微调集：
+  `python tools/yoga_mat_finetune_helper.py --source <failure_frames_dir> --out tests/reports/mat_finetune_dataset --label yoga_mat`
+- 用标注工具补齐每张失败样本的瑜伽垫框。
+- 完成后再运行训练命令（或在外部训练环境执行），并将新 `model_path` 更新到 V1 感知配置，复跑 TC-MAT-001。
+- 本阶段不改写真实机行为参数，仅用于恢复识别可靠性。
+
 ## 结果记录
 
 使用 `docs/testing/forms/V1_TEST_RECORD.md`，证据仅保存匿名化引用。
