@@ -1,0 +1,30 @@
+version: "0.1.0"
+
+environment:
+  default: SIM-MOCK
+  allowed:
+    - SIM-MOCK
+    - OFFLINE-CV
+    - HIL-SDK
+    - FIELD-YOGA
+
+execution:
+  main_flow_consecutive_passes: 10
+  action_timeout_seconds: null       # 按动作和厂商接口分别确认
+  connection_loss_timeout_ms: null   # 必须由厂商安全资料确认
+
+perception:
+  person_confidence: null            # 使用验证集确定
+  pose_confidence: null              # 使用验证集确定
+  gesture_hold_seconds: null         # 通过误触发/漏触发测试确定
+
+safety:
+  human_stop_distance_m: null        # 禁止未经批准直接用于真机
+  maximum_test_speed_mps: null       # 由厂商安全限制和场地批准确定
+  operator_emergency_stop_required: true
+  safety_observer_required: true
+
+privacy:
+  commit_raw_human_video: false
+  commit_raw_audio: false
+  anonymization_required: true

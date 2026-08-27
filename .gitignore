@@ -1,0 +1,40 @@
+# Local agent and temporary runtime files
+/.agents/
+/.codex-tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated test outputs
+/tests/reports/*
+!/tests/reports/.gitkeep
+
+# Raw media, sensor dumps, models, and hardware logs should use external storage
+/tests/fixtures/**/*.mp4
+/tests/fixtures/**/*.mov
+/tests/fixtures/**/*.avi
+/tests/fixtures/**/*.mkv
+/tests/fixtures/**/*.bag
+/tests/fixtures/**/*.db3
+/tests/fixtures/**/*.mcap
+/tests/fixtures/**/*.pcd
+/tests/fixtures/**/*.onnx
+/tests/fixtures/**/*.engine
+/tests/fixtures/**/*.log
