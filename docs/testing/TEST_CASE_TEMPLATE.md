@@ -9,7 +9,7 @@
 - 测试层级：L0 / L1 / L2 / L3 / L4
 - 优先级：必须 / 高 / 中
 - 自动化状态：Manual / Automated / Partial
-- 适用环境：SIM-MOCK / OFFLINE-CV / HIL-SDK / FIELD-YOGA
+- 适用环境：SIM-MOCK / OFFLINE-CV / HIL-SDK / HIL-VBOT-EDU / FIELD-YOGA
 
 ## 前置条件
 

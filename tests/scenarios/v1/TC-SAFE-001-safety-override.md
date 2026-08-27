@@ -4,7 +4,7 @@
 - 测试层级：L2 / L3 / L4
 - 优先级：必须
 - 自动化状态：Partial
-- 适用环境：SIM-MOCK / HIL-SDK / FIELD-YOGA
+- 适用环境：SIM-MOCK / HIL-VBOT-EDU / FIELD-YOGA
 
 ## 前置条件
 

@@ -11,3 +11,9 @@
 - 操作员与独立安全观察员。
 
 未经厂商正式授权，不在普通用户版上尝试破解、逆向或绕过认证。
+
+## 当前目标设备
+
+V1 已确认使用 **Vbot 超能机器狗“大头 EDU 版”**。设备属性配置位于 `config/device/vbot_edu.yaml`，测试计划位于 `docs/testing/VBOT_EDU_TEST_PLAN.md`，专用用例位于 `tests/hardware/vbot_edu/`。
+
+执行顺序必须从 `TC-HW-EDU-001` 开始；停止和失联测试通过前，不运行环绕、跟随或模仿动作。

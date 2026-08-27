@@ -11,7 +11,7 @@
 | 应用 / 模型 / 配置版本 | |
 | 设备型号 / 版本类型 | |
 | 固件 / SDK 版本 | |
-| 测试环境 | SIM-MOCK / OFFLINE-CV / HIL-SDK / FIELD-YOGA |
+| 测试环境 | SIM-MOCK / OFFLINE-CV / HIL-SDK / HIL-VBOT-EDU / FIELD-YOGA |
 | 场地、光照与网络 | |
 | 原始数据授权与删除日期 | 不适用 / 已授权：____ / 删除：____ |
 

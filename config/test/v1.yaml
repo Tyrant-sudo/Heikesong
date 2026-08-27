@@ -1,4 +1,6 @@
-version: "0.2.1"
+version: "0.3.0"
+
+device_profile: "config/device/vbot_edu.yaml"
 
 environment:
   default: SIM-MOCK
@@ -6,6 +8,7 @@ environment:
     - SIM-MOCK
     - OFFLINE-CV
     - HIL-SDK
+    - HIL-VBOT-EDU
     - FIELD-YOGA
 
 execution:

@@ -1,0 +1,77 @@
+profile_version: "0.1.0"
+profile_status: CONFIRMED-MODEL_PENDING-DEVICE-INTROSPECTION
+confirmed_on: "2026-08-27"
+
+selection:
+  manufacturer: "维他动力（北京）科技有限公司"
+  product_family: "Vbot 超能机器狗（大头）"
+  edition: "EDU"
+  confirmed_by: USER
+
+sources:
+  edu_product:
+    url: "https://www.worldrobotconference.com/expo/product/1030.html"
+    verified_on: "2026-08-27"
+  base_platform:
+    url: "https://www.vbot.cn/en/Detail"
+    verified_on: "2026-08-27"
+
+published_expectations:
+  edu_open_interface_categories:
+    - development_foundation_and_system_services
+    - motion_control
+    - perception_and_autonomous_mobility
+    - intelligent_interaction
+    - system_peripherals
+  base_platform_reference_only:
+    edge_ai_compute_tops: 128
+    sensing_camera: DEPTH_BINOCULAR
+    lidar_lines: 16
+    lidar_coverage_degrees: 360
+    joint_count: 14
+    approximate_weight_kg: 16
+    battery_capacity_wh: 594
+    communication:
+      - CELLULAR
+      - BLUETOOTH
+      - WIFI
+    safety_design:
+      - CONTACT_PROTECTION
+      - ANTI_PINCH_LIMITERS
+      - STREAMLINED_EDGES
+
+actual_device:
+  serial_number: null
+  hardware_revision: null
+  firmware_version: null
+  system_image_version: null
+  sdk_version: null
+  vendor_sdk_repository: null
+  vendor_documentation_version: null
+  ros_distribution: null
+  rmw_implementation: null
+  network_mode: null
+  device_ip: null
+  clock_source: null
+
+discovered_interfaces:
+  ros_nodes: []
+  topics: []
+  services: []
+  actions: []
+  coordinate_frames: []
+  cameras: []
+  lidars: []
+  motion_commands: []
+  stop_interfaces: []
+  photo_interfaces: []
+  external_ports: []
+
+gates:
+  require_vendor_documentation: true
+  require_device_identity_match: true
+  require_interface_inventory_before_motion: true
+  require_approved_speed_and_distance: true
+  require_stop_test_before_behavior_test: true
+  require_operator_emergency_stop: true
+  allow_unverified_motion: false

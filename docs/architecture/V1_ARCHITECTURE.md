@@ -46,7 +46,7 @@ services/timer ──► session events ──► coordinator and test reports
 ## 可替换接口
 
 - 感知模型只能通过 `perception/interfaces.py` 暴露结果，行为层不得直接调用某个模型框架。
-- 机器狗和相机只能通过 `actions/interfaces.py` 调用；普通版设备若没有正式 SDK，可继续完成离线与 Mock 测试。
+- 机器狗和相机只能通过 `actions/interfaces.py` 调用；目标设备为 Vbot 大头 EDU，具体 Adapter 仅在正式接口清单完成后实现，发现阶段继续使用 Mock。
 - 所有移动意图必须经过 `SafetySupervisor`，并实现取消路径。
 - `correlation_id` 串联姿态识别、模仿动作、照片和报告，便于检查一次识别只触发一次响应。
 

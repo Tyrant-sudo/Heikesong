@@ -2,17 +2,22 @@
 
 ```text
 Heikesong/
-├─ config/test/v1.yaml             # V1 阈值、环境与安全配置
+├─ config/
+│  ├─ device/vbot_edu.yaml         # Vbot EDU 参考与实机属性
+│  └─ test/v1.yaml                 # V1 阈值、环境与安全配置
 ├─ docs/
 │  ├─ architecture/
 │  │  └─ V1_ARCHITECTURE.md        # 模块边界、数据流和扩展点
+│  ├─ devices/
+│  │  └─ VBOT_EDU_BASELINE.md      # 设备确认、证据与待发现项
 │  └─ testing/
 │     ├─ V1_TEST_LIST.md           # 首批用例总表
 │     ├─ V1_TEST_PLAN.md           # 范围、阶段和发布门槛
+│     ├─ VBOT_EDU_TEST_PLAN.md      # EDU 硬件测试版本与门禁
 │     ├─ TRACEABILITY.md           # 需求—测试追踪矩阵
 │     ├─ INCREMENTAL_TESTING.md    # 增量与回归规则
 │     ├─ TEST_CASE_TEMPLATE.md     # 新场景用例模板
-│     └─ forms/                    # 执行记录、CSV、批次汇总表
+│     └─ forms/                    # V1 与 Vbot EDU 执行记录表
 ├─ src/heikesong/
 │  ├─ core/                        # 稳定领域模型、事件和状态
 │  ├─ perception/                  # 垫子、用户、姿态感知接口
@@ -23,7 +28,7 @@ Heikesong/
 ├─ tests/
 │  ├─ unit/                        # 纯逻辑、计时、边界测试
 │  ├─ integration/                 # 模块契约与 Mock 设备测试
-│  ├─ hardware/                    # 正式 SDK 与真机接口测试
+│  ├─ hardware/vbot_edu/           # Vbot EDU 属性与 HIL 门禁
 │  ├─ scenarios/v1/                # V1 单项和端到端场景
 │  ├─ manual/                      # 现场人工检查表
 │  ├─ fixtures/                    # 测试数据说明和小型合成数据
@@ -50,7 +55,7 @@ Heikesong/
 
 ### `actions/`
 
-隔离机器人动作与相机拍照。普通版设备没有正式 SDK 时，用 Mock Adapter 保持上层开发可进行，禁止通过逆向或破解接入。
+隔离机器人动作与相机拍照。当前通过 Vbot EDU 正式接口实现 Adapter；接口发现完成前继续使用 Mock，禁止猜测接口、逆向或绕过权限。
 
 ### `services/`
 
@@ -64,7 +69,7 @@ Heikesong/
 
 - `unit/` 不访问网络、摄像头和真实硬件。
 - `integration/` 验证“观察结果→行为→动作接口”和“安全事件→取消”。
-- `hardware/` 只测试厂商正式支持的接口，并记录设备、固件和 SDK。
+- `hardware/vbot_edu/` 只测试 Vbot EDU 正式支持的接口，并记录设备、固件、SDK 和精确接口清单。
 - `scenarios/v1/` 使用稳定用例 ID；自动化后保留同一编号。
 - `fixtures/` 不提交可识别真人的原始视频、照片、语音或大模型文件。
 - `reports/` 存本地或 CI 输出，表单模板放在 `docs/testing/forms/`。
