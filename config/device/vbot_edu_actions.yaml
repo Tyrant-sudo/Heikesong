@@ -1,0 +1,45 @@
+version: "0.1.0"
+
+voice:
+  wake_keywords: ["佳佳", "伽伽", "Jiajia", "jiajia"]
+  command_window_seconds: 10.0
+
+commands:
+  downward_dog:
+    keywords: ["下犬式"]
+    dag: /userdata/vbot/.local/share/heikesong/actions/DOWNWARD_DOG_ONCE.json
+    source_dag: /app/config/dags/actions/PILATES_D.json
+    source_dag_sha256: 96cbd4780d4f282b608088425f3f2640d0747d6b6257db25fb35f8eedf79521b
+    body_trajectory: /userdata/vbot/.local/share/heikesong/actions/PILATES_D_ONCE_50hz.npz
+    body_trajectory_sha256: 2b00b8efdb0e39124a0bdd4facef5440aba6cd83698d8873e43e3758a806ae01
+    head_trajectory: /userdata/vbot/.local/share/heikesong/actions/PILATES_D_ONCE.csv
+    head_trajectory_sha256: cae2d1516d4dc3bfe9b9627e5dd13134f860b0967fb8c8680367f2c692b2614d
+    frame_count: 399
+    duration_seconds: 7.98
+    cooldown_seconds: 30.0
+    recovery: /sm/action/lowlevel FIXED_STAND
+    hil_status: PASS
+  push_up:
+    keywords: ["俯卧撑"]
+    dag: /app/config/dags/actions/PUSHUP.json
+    sha256: 6ab610bd2c0cfb8ce4e687ac703aa60079b796a1cc526a1b45a59468ac09e511
+    cooldown_seconds: 30.0
+    hil_status: CONTROLLER_PASS_VISUAL_CONFIRMATION_PENDING
+  lay_down_and_watch:
+    keywords: ["趴下看人", "趴下看我", "坐下看人", "坐下看我"]
+    dag: /app/config/dags/idle/SIT_WITHHEAD.json
+    sha256: 9513826efb853f65e2e792ee110fef777c46273f4da55e575b7732b374e0a86b
+    effective_body_task: body.RL_ACTION_POLICY1
+    cooldown_seconds: 30.0
+    tracking_mode: vendor_body_head_emotion_action
+    hil_status: PASS
+  take_photo:
+    keywords: ["拍照"]
+    service: /get_jpeg_images
+    output: /userdata/vbot/.local/share/heikesong/photos
+    width: 960
+    height: 540
+    quality: 90
+    undistort: true
+    cooldown_seconds: 5.0
+    hil_status: PASS

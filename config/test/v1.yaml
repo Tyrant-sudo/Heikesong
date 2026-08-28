@@ -1,4 +1,4 @@
-version: "0.3.0"
+version: "0.4.1"
 
 device_profile: "config/device/vbot_edu.yaml"
 
@@ -35,6 +35,16 @@ behavior:
   direction_hold_seconds: null        # 方向稳定后才更新
   follow_distance_m: null             # 厂商和场地批准值
   pose_action_cooldown_seconds: null  # 同一姿势会话禁止重复触发
+  sit_watch_target_timeout_seconds: 1.0
+
+interaction:
+  start_keywords:
+    - "瑜伽"
+    - "伽伽"
+  start_feedback: "瑜伽开始了"
+  blink_then_flash_once: true
+  display_feedback_timeout_ms: null   # 经现场目视验收后冻结
+  happy_action_timeout_seconds: null  # 按厂商动作实测冻结
 
 timer:
   default_duration_seconds: null      # 由具体测试批次填写

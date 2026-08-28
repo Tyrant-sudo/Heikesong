@@ -1,0 +1,17 @@
+[Unit]
+Description=Heikesong offline command interaction and person head tracker
+
+[Service]
+Type=simple
+ExecStart=/userdata/vbot/.local/share/heikesong/voice_kws/bin/run_voice_person_tracker.sh
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=10
+Nice=5
+MemoryMax=256M
+Environment=HOME=/userdata/vbot
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

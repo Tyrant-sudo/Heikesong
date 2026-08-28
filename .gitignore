@@ -1,6 +1,14 @@
 # Local agent and temporary runtime files
 /.agents/
 /.codex-tmp/
+/artifacts/
+/tmp_*
+/tmp_models/
+/tmp_vbot_emotions/
+/nul
+/precheck_out.log
+/vbot_odometry_monitor.py
+/vbot_workstation_session.json5
 
 # Python
 __pycache__/
@@ -32,6 +40,9 @@ Thumbs.db
 /log/
 
 # Raw media, sensor dumps, models, and hardware logs should use external storage
+/assets/audio/*.wav
+!/assets/audio/jiajia_wake_ack_builtin.wav
+!/assets/audio/yoga_start_builtin_ai.wav
 /tests/fixtures/**/*.mp4
 /tests/fixtures/**/*.mov
 /tests/fixtures/**/*.avi

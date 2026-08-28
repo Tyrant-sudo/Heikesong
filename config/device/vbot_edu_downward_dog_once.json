@@ -1,0 +1,75 @@
+{
+  "task_id": "heikesong_downward_dog_once",
+  "priority": 70,
+  "required_resources": [
+    "LIGHT",
+    "SCREEN",
+    "LEGS",
+    "HEAD"
+  ],
+  "dag": {
+    "nodes": [
+      {
+        "id": "Action_BODY",
+        "task": "body.RL_ACTION_POLICY1",
+        "args": {
+          "action_path": "/userdata/vbot/.local/share/heikesong/actions/PILATES_D_ONCE_50hz.npz",
+          "action_params": {
+            "transition_stepping_enabled": true,
+            "transition_validation_mode": "required",
+            "transition_validation_payload_min_kg": -100.0,
+            "transition_validation_payload_max_kg": 3.0,
+            "transition_validation_ramp_angle_deg": 5.0
+          }
+        },
+        "dependencies": [
+          "Light"
+        ],
+        "wait_time_ms": 0,
+        "timeout_ms": 25000
+      },
+      {
+        "id": "Action_HEAD",
+        "task": "head.STREAM",
+        "args": {
+          "action_path": "/userdata/vbot/.local/share/heikesong/actions/PILATES_D_ONCE.csv"
+        },
+        "dependencies": [
+          "Light"
+        ],
+        "wait_time_ms": 0,
+        "timeout_ms": 25000
+      },
+      {
+        "id": "Emotion",
+        "task": "emotion.HAPPY_10S",
+        "args": {
+          "duration_ms": 0,
+          "emotion_id": 4
+        },
+        "dependencies": [
+          "Light"
+        ],
+        "wait_time_ms": 0,
+        "timeout_ms": 25000,
+        "lifecycle": "daemon"
+      },
+      {
+        "id": "Light",
+        "task": "light.FIXEDCOLOR",
+        "args": {
+          "red": 49,
+          "green": 180,
+          "blue": 120,
+          "brightness": 180,
+          "speed": 1
+        },
+        "dependencies": [],
+        "wait_time_ms": 0,
+        "timeout_ms": 25000,
+        "lifecycle": "daemon"
+      }
+    ]
+  },
+  "optional_resources": []
+}

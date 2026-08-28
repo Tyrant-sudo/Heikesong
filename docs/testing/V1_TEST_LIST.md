@@ -10,6 +10,8 @@
 | `TC-PER-001` | 识别用户位置 | 有人/无人、相对垫子的区域和位置连续性 | L1/L2/L4 | 高 | OFFLINE-CV |
 | `TC-POSE-001` | 识别下犬式 | 正例、相似姿势负例、持续时间、离开姿势复位 | L1/L2/L4 | 高 | OFFLINE-CV |
 | `TC-ACT-001` | 模仿与拍照 | 一次姿态事件只触发一次模仿和一次拍照，二者共用关联 ID | L2/L3/L4 | 高 | SIM-MOCK / HIL-VBOT-EDU |
+| `TC-ACT-002` | V1 瑜伽动作集 | 下犬式组合、俯卧撑、坐下注视、取消和安全恢复 | L2/L3/L4 | 高 | SIM-MOCK / HIL-VBOT-EDU |
+| `TC-INT-001` | 瑜伽开始反馈 | “瑜伽”或“伽伽”触发眨眼闪屏、开心动作和“瑜伽开始了” | L1/L2/L3/L4 | 高 | SIM-MOCK / HIL-VBOT-EDU |
 | `TC-BEH-002` | 跟随用户方向 | 方向变化后更新、微小抖动不频繁转向、用户丢失后停止 | L1/L2/L4 | 高 | SIM-MOCK / OFFLINE-CV / HIL-VBOT-EDU |
 | `TC-TIM-001` | 计时 | 开始、暂停、恢复、停止、到时与时间误差 | L1/L2/L4 | 高 | SIM-MOCK |
 | `TC-SAFE-001` | 安全抢占 | 环绕/跟随期间遇人、障碍、失联或急停立即取消运动 | L2/L3/L4 | 必须 | SIM-MOCK / HIL-VBOT-EDU |

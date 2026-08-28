@@ -14,6 +14,11 @@
 | BEH-001 | 在瑜伽垫批准环带内完成一次安全环绕 | 高 | behavior | TC-BEH-001 | Planned |
 | BEH-002 | 按稳定后的用户方向更新跟随目标 | 高 | behavior | TC-BEH-002 | Planned |
 | ACT-001 | 下犬式确认后执行一次模仿动作 | 高 | actions/behavior | TC-ACT-001, TC-HW-EDU-004, TC-HW-EDU-008 | Ready-for-EDU-HIL |
+| ACT-002 | 提供下犬式组合与俯卧撑两个可取消动作 | 高 | actions/behavior | TC-ACT-002, TC-HW-EDU-004, TC-HW-EDU-008 | Planned |
+| BEH-003 | 坐下后持续注视单个用户，目标丢失时停止追踪 | 高 | behavior/actions | TC-ACT-002, TC-PER-001, TC-SAFE-001 | Planned |
+| DSP-001 | 屏幕执行一次眨眼后短闪的非循环反馈 | 高 | actions | TC-INT-001, TC-HW-EDU-008 | Ready-for-EDU-HIL |
+| VOI-001 | 使用 TTS 清晰播报“瑜伽开始了” | 高 | actions | TC-INT-001, TC-HW-EDU-008 | Ready-for-EDU-HIL |
+| INT-001 | “瑜伽”或“伽伽”触发眨眼闪屏、开心动作和开始播报 | 高 | behavior/actions | TC-INT-001, TC-E2E-001 | Implemented |
 | CAM-001 | 下犬式确认后拍摄一次照片 | 高 | actions | TC-ACT-001, TC-HW-EDU-005 | Ready-for-EDU-HIL |
 | CAM-002 | 照片与姿态/动作共享关联 ID 并符合隐私策略 | 必须 | actions/core | TC-ACT-001 | Planned |
 | TIM-001 | 支持开始、暂停、恢复、停止和到时 | 高 | services | TC-TIM-001 | Implemented |

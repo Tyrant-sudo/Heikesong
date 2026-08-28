@@ -1,0 +1,37 @@
+version: 1
+camera:
+  undistort: true
+  calibrated_resolution: [480, 270]
+  frame_id: stereo_left
+  intrinsics: [162.14315136170416, 162.14315136170416, 239.5, 134.5]
+mat:
+  physical_size_cm: [80, 180]
+  color_description: flesh_pink_purple
+  color_space: LAB
+  lab_lower: [130, 131, 125]
+  lab_upper: [180, 140, 134]
+  ground_top_fraction: 0.58
+  min_area_fraction: 0.0045
+  min_solidity: 0.84
+  reject_clipped_boundary: true
+safety:
+  stable_frames_required: 10
+  allow_motion_from_single_frame: false
+  projection_frame: map
+  maximum_corner_jitter_px: 4.0
+  maximum_reprojection_error_px: 3.0
+  minimum_gravity_alignment: 0.85
+  robot_standing_size_m: [0.613, 0.339]
+  robot_circumscribed_radius_m: 0.350
+  edge_clearance_m: 0.050
+  keepout_expansion_m: 0.400
+  occupancy_grid_resolution_m: 0.050
+  vendor_navigation_keepout_api_available: false
+topics:
+  mat_polygon: /heikesong/yoga_mat/polygon_map
+  keepout_polygon: /heikesong/yoga_mat/keepout_map
+  keepout_grid: /heikesong/yoga_mat/keepout_grid
+  status: /heikesong/yoga_mat/status
+  requested_velocity: /heikesong/nav/cmd_vel_requested
+  safe_velocity: /heikesong/nav/cmd_vel_safe
+  gate_status: /heikesong/nav/keepout_gate_status
