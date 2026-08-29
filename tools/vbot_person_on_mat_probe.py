@@ -15,10 +15,7 @@ import numpy as np
 import rclpy
 from camera_msgs.msg import JpegRequest
 from camera_msgs.srv import GetJpegImages
-from rclpy.duration import Duration
 from rclpy.node import Node
-from rclpy.time import Time
-from tf2_ros import Buffer, TransformListener
 from vision_msgs.msg import PoseDetection
 
 
@@ -26,20 +23,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from heikesong.perception.yoga_mat_color import ColorYogaMatDetector  # noqa: E402
-from heikesong.perception.ground_projection import (  # noqa: E402
-    CameraIntrinsics,
-    MatProjectionError,
-    project_mat_boundary_to_world,
-    quaternion_xyzw_to_matrix,
-)
-
-
-INTRINSICS_640 = CameraIntrinsics(
-    fx=216.1908684822722,
-    fy=216.1908684822722,
-    cx=319.3333333333333,
-    cy=179.3333333333333,
-)
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,8 +43,6 @@ class PersonOnMatProbe(Node):
     def __init__(self) -> None:
         super().__init__("heikesong_person_on_mat_probe")
         self.camera = self.create_client(GetJpegImages, "/get_jpeg_images")
-        self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
-        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.groups: dict[tuple[int, int], list[PoseDetection]] = defaultdict(list)
         self.create_subscription(PoseDetection, "/perception/poses", self._on_pose, 20)
 
@@ -133,57 +114,11 @@ def mat_polygon(image: np.ndarray) -> tuple[np.ndarray, str, float, dict[str, in
     return quadrilateral, "partial_color_region", min(0.75, area_fraction * 20.0), analysis.rejection_counts
 
 
-def project_target_to_base(
-    node: PersonOnMatProbe,
+def evaluate_person(
+    message: PoseDetection,
     polygon: np.ndarray,
-    target: dict[str, object],
+    image_shape: tuple[int, int],
 ) -> dict[str, object]:
-    transform = node.tf_buffer.lookup_transform("base_link", "stereo_left", Time())
-    translation = transform.transform.translation
-    rotation = transform.transform.rotation
-    projection = project_mat_boundary_to_world(
-        polygon,
-        INTRINSICS_640,
-        quaternion_xyzw_to_matrix((rotation.x, rotation.y, rotation.z, rotation.w)),
-        np.asarray([translation.x, translation.y, translation.z], dtype=np.float64),
-        max_reprojection_rms_px=4.0,
-    )
-    bbox = target["bbox"]
-    point = np.asarray([(bbox[0] + bbox[2]) * 0.5, bbox[3]], dtype=np.float64)
-    best = None
-    boundary_world = np.asarray(projection.boundary_world, dtype=np.float64)
-    for index in range(4):
-        start = polygon[index].astype(np.float64)
-        end = polygon[(index + 1) % 4].astype(np.float64)
-        direction = end - start
-        denominator = float(direction @ direction)
-        fraction = 0.0 if denominator <= 0.0 else float((point - start) @ direction / denominator)
-        fraction = min(1.0, max(0.0, fraction))
-        image_match = start + fraction * direction
-        error = float(np.linalg.norm(point - image_match))
-        world_match = boundary_world[index] + fraction * (
-            boundary_world[(index + 1) % 4] - boundary_world[index]
-        )
-        candidate = (error, index, fraction, image_match, world_match)
-        if best is None or candidate[0] < best[0]:
-            best = candidate
-    assert best is not None
-    world = best[4]
-    return {
-        "position_base": [float(value) for value in world],
-        "range_base_m": float(np.hypot(world[0], world[1])),
-        "bearing_base_deg": float(np.degrees(np.arctan2(world[1], world[0]))),
-        "matched_edge_index": int(best[1]),
-        "matched_edge_fraction": float(best[2]),
-        "image_gap_px": float(best[0]),
-        "projection_reprojection_rms_px": projection.reprojection_rms_px,
-        "projection_gravity_alignment": projection.gravity_alignment,
-        "projection_camera_distance_m": projection.camera_distance_m,
-        "mat_boundary_base": [list(point) for point in projection.boundary_world],
-    }
-
-
-def evaluate_person(message: PoseDetection, polygon: np.ndarray) -> dict[str, object]:
     x1, y1 = float(message.bbox_min.x), float(message.bbox_min.y)
     x2, y2 = float(message.bbox_max.x), float(message.bbox_max.y)
     bottom = ((x1 + x2) * 0.5, y2)
@@ -194,9 +129,10 @@ def evaluate_person(message: PoseDetection, polygon: np.ndarray) -> dict[str, ob
             points.append((name, float(keypoint.x), float(keypoint.y)))
     matches = [name for name, x, y in points if _point_near_polygon((x, y), polygon)]
 
-    person_mask = np.zeros((360, 640), dtype=np.uint8)
+    height, width = image_shape
+    person_mask = np.zeros((height, width), dtype=np.uint8)
     px1, py1 = max(0, round(x1)), max(0, round(y1))
-    px2, py2 = min(639, round(x2)), min(359, round(y2))
+    px2, py2 = min(width - 1, round(x2)), min(height - 1, round(y2))
     if px2 > px1 and py2 > py1:
         person_mask[py1 : py2 + 1, px1 : px2 + 1] = 255
     mat_mask = np.zeros_like(person_mask)
@@ -228,16 +164,12 @@ def main() -> int:
         latest_stamp = max(node.groups)
         detections = [message for message in node.groups[latest_stamp] if message.class_id == 0]
         polygon, mat_mode, mat_confidence, rejections = mat_polygon(image)
-        people = [evaluate_person(message, polygon) for message in detections]
+        people = [
+            evaluate_person(message, polygon, image.shape[:2])
+            for message in detections
+        ]
         people.sort(key=lambda item: (item["association_score"], item["score"]), reverse=True)
         target = people[0] if people and people[0]["association_score"] >= 2.0 else None
-        target_ground = None
-        projection_error = None
-        if target:
-            try:
-                target_ground = project_target_to_base(node, polygon, target)
-            except (MatProjectionError, Exception) as error:
-                projection_error = str(error)
 
         annotated = image.copy()
         cv2.polylines(annotated, [polygon.astype(np.int32)], True, (255, 0, 255), 3)
@@ -269,8 +201,6 @@ def main() -> int:
             "mat_rejections": rejections,
             "people": people,
             "target": target,
-            "target_ground": target_ground,
-            "projection_error": projection_error,
             "image": str(image_path),
         }
         report_path = Path(args.report)

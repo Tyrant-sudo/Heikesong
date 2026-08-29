@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import hashlib
 import io
+import json
+import random
 import sys
 import time
 import uuid
@@ -28,6 +31,19 @@ try:
         VoiceCommandRouter,
         v1_command_specs,
     )
+    from heikesong.behavior.v2_session import (
+        TriggerSource,
+        V2ModeState,
+        V2SessionCoordinator,
+        V2Task,
+    )
+    from heikesong.perception.coarse_human_pose import (
+        CoarsePoseConfig,
+        CoarsePoseFrame,
+        CoarsePoseLabel,
+        CoarsePoseTracker,
+        PoseKeypoint,
+    )
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from heikesong.actions.photo_store import (
@@ -42,6 +58,19 @@ except ImportError:
         VoiceCommandRouter,
         v1_command_specs,
     )
+    from heikesong.behavior.v2_session import (
+        TriggerSource,
+        V2ModeState,
+        V2SessionCoordinator,
+        V2Task,
+    )
+    from heikesong.perception.coarse_human_pose import (
+        CoarsePoseConfig,
+        CoarsePoseFrame,
+        CoarsePoseLabel,
+        CoarsePoseTracker,
+        PoseKeypoint,
+    )
 
 import rclpy
 from camera_msgs.msg import JpegRequest
@@ -53,7 +82,7 @@ from peripheral_msgs.srv import DisplayImgs, PlayEmotion
 from speech_msgs.msg import SpeechDogToPhone, SpeechPhoneToDog, WakeupInfo
 from speech_msgs.srv import SpeechControl
 from software_msgs.srv import LowlevelAction
-from std_srvs.srv import SetBool
+from std_srvs.srv import SetBool, Trigger
 from vision_msgs.msg import PoseDetection
 
 
@@ -72,11 +101,17 @@ class VoicePersonTrackerNode:
         yoga_wake_audio_path: Path = Path(
             "/userdata/vbot/.local/share/heikesong/audio/jiajia_wake_ack_builtin.wav"
         ),
+        countdown_audio_path: Path = Path(
+            "/userdata/vbot/.local/share/heikesong/audio/countdown_10s.wav"
+        ),
         yoga_action_path: Path = Path("/app/config/dags/idle/HAPPINESS.json"),
         downward_dog_action_path: Path = Path(
             "/userdata/vbot/.local/share/heikesong/actions/DOWNWARD_DOG_ONCE.json"
         ),
-        push_up_action_path: Path = Path("/app/config/dags/actions/PUSHUP.json"),
+        push_up_action_path: Path = Path(
+            "/userdata/vbot/.local/share/heikesong/actions/"
+            "PUSHUP_WITHOUT_LATE_HIGHS.json"
+        ),
         lay_down_action_path: Path = Path(
             "/app/config/dags/idle/SIT_WITHHEAD.json"
         ),
@@ -84,6 +119,16 @@ class VoicePersonTrackerNode:
             "/userdata/vbot/.local/share/heikesong/photos"
         ),
         command_arm_seconds: float = 10.0,
+        enable_v2: bool = False,
+        enable_v2_motion: bool = False,
+        high_five_left_action_path: Path = Path(
+            "/app/config/dags/actions/HIGH_FIVE_L.json"
+        ),
+        high_five_right_action_path: Path = Path(
+            "/app/config/dags/actions/HIGH_FIVE_R.json"
+        ),
+        v2_pose_hold_seconds: float = 1.2,
+        v2_stationary_hold_seconds: float = 5.0,
     ) -> None:
         self.node = rclpy.create_node("heikesong_voice_person_tracker")
         self.session_seconds = session_seconds
@@ -102,18 +147,36 @@ class VoicePersonTrackerNode:
         self.last_keyword_at_s: dict[str, float] = {}
         self.pending_yoga_wake_ack = False
         self.pending_command: tuple[str, str] | None = None
+        self.deferred_voice_commands: deque[tuple[str, str]] = deque(maxlen=4)
         self.yoga_audio_path = yoga_audio_path
         self.yoga_wake_audio_path = yoga_wake_audio_path
+        self.countdown_audio_path = countdown_audio_path
         self.yoga_action_path = yoga_action_path
         self.downward_dog_action_path = downward_dog_action_path
         self.push_up_action_path = push_up_action_path
         self.lay_down_action_path = lay_down_action_path
+        self.high_five_left_action_path = high_five_left_action_path
+        self.high_five_right_action_path = high_five_right_action_path
         self.photo_store = PhotoArtifactStore(photo_output_path)
         self.command_router = VoiceCommandRouter(
             v1_command_specs(), arm_seconds=command_arm_seconds
         )
         self.keyword_spotter: Any | None = None
         self.keyword_stream: Any | None = None
+        self.enable_v2 = enable_v2
+        self.enable_v2_motion = enable_v2_motion
+        self.v2 = V2SessionCoordinator()
+        self.v2_pose = CoarsePoseTracker(
+            CoarsePoseConfig(
+                pose_hold_seconds=v2_pose_hold_seconds,
+                stationary_hold_seconds=v2_stationary_hold_seconds,
+            )
+        )
+        self.v2_deadline_s: float | None = None
+        self.last_v2_observation_log_s = 0.0
+        self.v2_tracking_target = "body"
+        self.v2_tracking_switch_at_s = 0.0
+        self.v2_random = random.Random()
         self.head_client = self.node.create_client(HeadAction, "/head_action")
         self.context_client = self.node.create_client(
             GetContext, "/function/context/get_context"
@@ -136,6 +199,12 @@ class VoicePersonTrackerNode:
         self.camera_client = self.node.create_client(
             GetJpegImages, "/get_jpeg_images"
         )
+        self.orbit_start_client = self.node.create_client(
+            Trigger, "/heikesong/person_orbit/start_auto"
+        )
+        self.orbit_status_client = self.node.create_client(
+            Trigger, "/heikesong/person_orbit/get_status"
+        )
         self.node.create_service(
             SetBool,
             "/heikesong/person_head_tracking/set_enabled",
@@ -150,6 +219,12 @@ class VoicePersonTrackerNode:
             "push_up": self._run_push_up,
             "lay_down_and_watch": self._run_lay_down_and_watch,
             "take_photo": self._run_take_photo,
+            "countdown_10s": self._run_countdown_10s,
+            "support_watch": self._run_lay_down_and_watch,
+            "seated_countdown": self._run_support_watch,
+            "high_five_left": self._run_high_five_left,
+            "high_five_right": self._run_high_five_right,
+            "person_orbit": self._run_person_orbit,
         }
         if wake_trigger:
             self.node.create_subscription(
@@ -241,7 +316,13 @@ class VoicePersonTrackerNode:
             self.pending_stop = True
             self.pending_stop_reason = f"offline keyword: {keyword}"
         else:
-            decision = self.command_router.handle(keyword, now_s)
+            decision = self.command_router.handle(
+                keyword,
+                now_s,
+                allow_without_wake=(
+                    self.enable_v2 and self.v2.state is not V2ModeState.IDLE
+                ),
+            )
             if decision.action == "wake_ack":
                 self.pending_yoga_wake_ack = True
                 self.node.get_logger().info("voice command window armed")
@@ -253,7 +334,7 @@ class VoicePersonTrackerNode:
                 correlation_id = (
                     f"VOICE-{decision.command.upper()}-{uuid.uuid4().hex[:10]}"
                 )
-                self.pending_command = (decision.command, correlation_id)
+                self._accept_command(decision.command, correlation_id, now_s)
                 self.node.get_logger().info(
                     f"pre-wake command paired: command={decision.command} "
                     f"correlation_id={correlation_id}"
@@ -262,7 +343,7 @@ class VoicePersonTrackerNode:
                 correlation_id = (
                     f"VOICE-{decision.command.upper()}-{uuid.uuid4().hex[:10]}"
                 )
-                self.pending_command = (decision.command, correlation_id)
+                self._accept_command(decision.command, correlation_id, now_s)
                 self.node.get_logger().info(
                     f"voice command accepted: command={decision.command} "
                     f"correlation_id={correlation_id}"
@@ -298,30 +379,218 @@ class VoicePersonTrackerNode:
             f"tracking enabled for {self.session_seconds:.1f}s"
         )
 
-    def _on_pose(self, message: PoseDetection) -> None:
-        if self.active_until_s is None or message.class_id != 0:
+    def _accept_command(
+        self, command: str, correlation_id: str, now_s: float
+    ) -> None:
+        if not self.enable_v2:
+            if command == "yoga_end":
+                self.node.get_logger().info("yoga end ignored outside V2 mode")
+                return
+            self.pending_command = (command, correlation_id)
             return
-        face_points = [
-            point for point in message.keypoints[:5] if point.confidence >= 0.45
-        ]
-        if face_points:
-            confidence_sum = sum(point.confidence for point in face_points)
-            center_x = sum(
-                point.x * point.confidence for point in face_points
-            ) / confidence_sum
-            center_y = sum(
-                point.y * point.confidence for point in face_points
-            ) / confidence_sum
+
+        if command == "yoga_start":
+            decision = self.v2.enter_mode()
+            if decision.action != "mode_started":
+                self.node.get_logger().info(decision.reason)
+                return
+            self.v2_pose.reset()
+            self.v2_deadline_s = now_s + self.session_seconds
+            self.v2_tracking_target = "body"
+            self.v2_tracking_switch_at_s = now_s
+            if self.active_until_s is None:
+                self.pending_wakeup = True
+            self.pending_command = (command, correlation_id)
+            self.node.get_logger().info("V2 yoga mode started")
+            return
+
+        if command == "yoga_end":
+            self.deferred_voice_commands.clear()
+            decision = self.v2.request_end()
+            if decision.action == "run_task":
+                self._queue_v2_decision(decision, correlation_id)
+                self.node.get_logger().info(
+                    "V2 yoga end accepted; high five queued"
+                )
+            elif decision.action == "end_deferred":
+                self.node.get_logger().info(
+                    "V2 yoga end deferred until the current task is safe"
+                )
+            else:
+                self.node.get_logger().warning(decision.reason)
+            return
+
+        task_by_command = {
+            "downward_dog": V2Task.DOWNWARD_DOG,
+            "push_up": V2Task.PUSH_UP,
+            "lay_down_and_watch": V2Task.SUPPORT_WATCH,
+            "take_photo": V2Task.TAKE_PHOTO,
+            "countdown_10s": V2Task.SEATED_COUNTDOWN,
+            "person_orbit": V2Task.PERSON_ORBIT,
+        }
+        task = task_by_command.get(command)
+        if task is None:
+            self.node.get_logger().warning(f"unknown V2 command: {command}")
+            return
+        if self.v2.state is V2ModeState.TASK_RUNNING:
+            if len(self.deferred_voice_commands) == self.deferred_voice_commands.maxlen:
+                self.node.get_logger().warning(
+                    "V2 voice queue full; oldest command discarded"
+                )
+            self.deferred_voice_commands.append((command, correlation_id))
+            self.node.get_logger().info(
+                f"V2 voice command deferred during motion: command={command}"
+            )
+            return
+        decision = self.v2.request_task(task, TriggerSource.VOICE, now_s)
+        self._queue_v2_decision(decision, correlation_id)
+
+    def _queue_v2_decision(self, decision, correlation_id: str) -> None:
+        if decision.action != "run_task" or decision.task is None:
+            self.node.get_logger().info(
+                f"V2 request ignored: task={decision.task} reason={decision.reason}"
+            )
+            return
+        if self.pending_command is not None:
+            self.v2.finish_task(time.monotonic(), succeeded=False)
+            self.node.get_logger().warning("V2 request dropped because a command is queued")
+            return
+        command_by_task = {
+            V2Task.DOWNWARD_DOG: "downward_dog",
+            V2Task.PUSH_UP: "push_up",
+            V2Task.SUPPORT_WATCH: "support_watch",
+            V2Task.SEATED_COUNTDOWN: "seated_countdown",
+            V2Task.TAKE_PHOTO: "take_photo",
+            V2Task.HIGH_FIVE_LEFT: "high_five_left",
+            V2Task.HIGH_FIVE_RIGHT: "high_five_right",
+            V2Task.PERSON_ORBIT: "person_orbit",
+        }
+        self.pending_command = (command_by_task[decision.task], correlation_id)
+        self.node.get_logger().info(
+            f"V2 task queued: task={decision.task.value} correlation_id={correlation_id}"
+        )
+
+    def _on_pose(self, message: PoseDetection) -> None:
+        if message.class_id != 0:
+            return
+        now_s = time.monotonic()
+        if self.enable_v2 and self.v2.state is not V2ModeState.IDLE:
+            if self.v2.state is not V2ModeState.TASK_RUNNING:
+                frame = CoarsePoseFrame(
+                    keypoints=tuple(
+                        PoseKeypoint(point.x, point.y, point.confidence)
+                        for point in message.keypoints
+                    ),
+                    bbox_min_x=message.bbox_min.x,
+                    bbox_min_y=message.bbox_min.y,
+                    bbox_max_x=message.bbox_max.x,
+                    bbox_max_y=message.bbox_max.y,
+                    score=message.score,
+                    observed_at_s=now_s,
+                )
+                observation = self.v2_pose.update(frame)
+                self._handle_v2_visual_observation(observation)
+        if self.active_until_s is None:
+            return
+        if self.enable_v2 and self.v2.state is not V2ModeState.IDLE:
+            if now_s >= self.v2_tracking_switch_at_s:
+                self.v2_tracking_target = self.v2_random.choice(("face", "body"))
+                self.v2_tracking_switch_at_s = now_s + self.v2_random.uniform(
+                    4.0, 7.0
+                )
+                self.node.get_logger().info(
+                    f"V2 tracking target switched: {self.v2_tracking_target}"
+                )
+            face_points = [
+                point for point in message.keypoints[:5] if point.confidence >= 0.45
+            ]
+            if self.v2_tracking_target == "face" and face_points:
+                confidence_sum = sum(point.confidence for point in face_points)
+                center_x = sum(
+                    point.x * point.confidence for point in face_points
+                ) / confidence_sum
+                center_y = sum(
+                    point.y * point.confidence for point in face_points
+                ) / confidence_sum
+            else:
+                center_x = (message.bbox_min.x + message.bbox_max.x) / 2.0
+                center_y = message.bbox_min.y + (
+                    message.bbox_max.y - message.bbox_min.y
+                ) * 0.60
         else:
-            center_x = (message.bbox_min.x + message.bbox_max.x) / 2.0
-            center_y = message.bbox_min.y + (
-                message.bbox_max.y - message.bbox_min.y
-            ) * 0.15
+            face_points = [
+                point for point in message.keypoints[:5] if point.confidence >= 0.45
+            ]
+            if face_points:
+                confidence_sum = sum(point.confidence for point in face_points)
+                center_x = sum(
+                    point.x * point.confidence for point in face_points
+                ) / confidence_sum
+                center_y = sum(
+                    point.y * point.confidence for point in face_points
+                ) / confidence_sum
+            else:
+                center_x = (message.bbox_min.x + message.bbox_max.x) / 2.0
+                center_y = message.bbox_min.y + (
+                    message.bbox_max.y - message.bbox_min.y
+                ) * 0.15
         self.policy.observe(
             center_x,
             message.score,
-            time.monotonic(),
+            now_s,
             center_y_px=center_y,
+        )
+
+    def _handle_v2_visual_observation(self, observation) -> None:
+        now_s = observation.observed_at_s
+        if now_s - self.last_v2_observation_log_s >= 1.0:
+            self.last_v2_observation_log_s = now_s
+            raised_hand = (
+                observation.raised_hand.value
+                if observation.raised_hand is not None
+                else "none"
+            )
+            self.node.get_logger().info(
+                "V2 visual observation: "
+                f"label={observation.label.value} "
+                f"held_s={observation.label_held_for_s:.2f} "
+                f"stationary_s={observation.stationary_for_s:.2f} "
+                f"raised_hand={raised_hand} "
+                f"framing_complete={observation.framing_complete}"
+            )
+        if self.pending_command is not None:
+            return
+        if self.v2.state is V2ModeState.HIGH_FIVE_READY:
+            if observation.raised_hand is None:
+                return
+            decision = self.v2.confirm_high_five(
+                observation.raised_hand.value, now_s
+            )
+            correlation_id = (
+                f"VISUAL-HIGH-FIVE-{observation.raised_hand.value.upper()}-"
+                f"{uuid.uuid4().hex[:10]}"
+            )
+            self._queue_v2_decision(decision, correlation_id)
+            return
+        task = None
+        token = None
+        if observation.pose_trigger is CoarsePoseLabel.DOWNWARD_DOG:
+            task = V2Task.DOWNWARD_DOG
+            token = f"downward-dog-{int(now_s * 1000)}"
+        elif observation.pose_trigger is CoarsePoseLabel.PUSH_UP:
+            task = V2Task.PUSH_UP
+            token = f"push-up-{int(now_s * 1000)}"
+        elif observation.support_trigger:
+            task = V2Task.SUPPORT_WATCH
+            token = f"stationary-{int(now_s * 1000)}"
+        if task is None:
+            return
+        decision = self.v2.request_task(
+            task, TriggerSource.VISUAL, now_s, visual_token=token
+        )
+        self._queue_v2_decision(
+            decision,
+            f"VISUAL-{task.value.upper()}-{uuid.uuid4().hex[:10]}",
         )
 
     def tick(self) -> None:
@@ -351,13 +620,60 @@ class VoicePersonTrackerNode:
                     f"no handler registered for command={command}"
                 )
                 return
+            v2_task_running = (
+                self.enable_v2
+                and self.v2.state is V2ModeState.TASK_RUNNING
+                and self.v2.active_task is not None
+            )
+            succeeded = False
             try:
-                handler(correlation_id)
+                if v2_task_running and not self.enable_v2_motion:
+                    self.node.get_logger().info(
+                        f"V2 dry-run accepted without motion: command={command} "
+                        f"correlation_id={correlation_id}"
+                    )
+                elif (
+                    self.enable_v2
+                    and command == "yoga_start"
+                    and not self.enable_v2_motion
+                ):
+                    self._run_yoga_feedback_without_body(correlation_id)
+                else:
+                    if v2_task_running and self.active_until_s is not None:
+                        self.stop(f"V2 task starting: {command}")
+                    handler(correlation_id)
+                succeeded = True
             except Exception as error:
                 self.node.get_logger().error(
                     f"voice command failed: command={command} "
                     f"correlation_id={correlation_id} error={error}"
                 )
+            finally:
+                if v2_task_running:
+                    decision = self.v2.finish_task(
+                        time.monotonic(), succeeded=succeeded
+                    )
+                    self.v2_pose.resume_after_robot_motion()
+                    if decision.action == "run_task":
+                        self._queue_v2_decision(
+                            decision,
+                            f"VOICE-YOGA-END-{uuid.uuid4().hex[:10]}",
+                        )
+                    elif decision.action == "mode_ended":
+                        self._finish_v2_mode("yoga end interaction completed")
+                    elif self.v2.state is V2ModeState.ACTIVE:
+                        self.v2_deadline_s = time.monotonic() + self.session_seconds
+                        if self.deferred_voice_commands:
+                            deferred_command, deferred_id = (
+                                self.deferred_voice_commands.popleft()
+                            )
+                            self._accept_command(
+                                deferred_command,
+                                deferred_id,
+                                time.monotonic(),
+                            )
+                        elif self.active_until_s is None:
+                            self.pending_wakeup = True
             return
         if self.pending_stop:
             self.pending_stop = False
@@ -367,6 +683,14 @@ class VoicePersonTrackerNode:
             return
         if self.pending_wakeup:
             self._start_pending_session(now_s)
+        if (
+            self.enable_v2
+            and self.v2_deadline_s is not None
+            and now_s >= self.v2_deadline_s
+            and self.v2.state is not V2ModeState.TASK_RUNNING
+        ):
+            self._finish_v2_mode("V2 session timeout")
+            return
         if self.active_until_s is None:
             return
         if now_s >= self.active_until_s:
@@ -400,30 +724,49 @@ class VoicePersonTrackerNode:
                 )
 
     def _run_yoga_feedback(self, correlation_id: str) -> None:
-        if not self._motion_context_is_safe():
-            self.node.get_logger().error(
-                "yoga feedback rejected by safety context"
-            )
-            return
+        body_feedback_completed = False
         try:
-            self._notify_action(True)
+            if self._motion_context_is_safe():
+                self._return_to_fixed_stand(f"{correlation_id}-ENTER-STAND")
+                self._notify_action(True)
+                try:
+                    self._perform_happy_body(correlation_id)
+                    body_feedback_completed = True
+                finally:
+                    self._notify_action(False)
+            else:
+                self.node.get_logger().error(
+                    "yoga body feedback rejected by safety context"
+                )
+        except Exception as error:
+            self.node.get_logger().error(f"yoga body feedback failed: {error}")
+
+        try:
             self._play_yoga_audio()
             self._play_emotion(mode=0, duration_ms=700)
             time.sleep(0.75)
             self._short_flash()
-            self._perform_happy_body(correlation_id)
             self.node.get_logger().info(
-                f"yoga start feedback completed: correlation_id={correlation_id}"
+                "yoga start feedback completed: "
+                f"correlation_id={correlation_id} "
+                f"body_completed={body_feedback_completed}"
             )
         except Exception as error:
-            self.node.get_logger().error(f"yoga start feedback failed: {error}")
+            self.node.get_logger().error(f"yoga audio/visual feedback failed: {error}")
+
+    def _run_yoga_feedback_without_body(self, correlation_id: str) -> None:
+        self._notify_action(True)
+        try:
+            self._play_yoga_audio()
+            self._play_emotion(mode=0, duration_ms=700)
+            time.sleep(0.75)
+            self._short_flash()
+            self.node.get_logger().info(
+                "V2 dry-run start feedback completed without body motion: "
+                f"correlation_id={correlation_id}"
+            )
         finally:
-            try:
-                self._notify_action(False)
-            except Exception as error:
-                self.node.get_logger().error(
-                    f"failed to leave action voice mode: {error}"
-                )
+            self._notify_action(False)
 
     def _run_downward_dog(self, correlation_id: str) -> None:
         self._run_motion_dag(
@@ -436,10 +779,111 @@ class VoicePersonTrackerNode:
     def _run_push_up(self, correlation_id: str) -> None:
         self._run_motion_dag("push_up", self.push_up_action_path, correlation_id)
 
+    def _run_countdown_10s(self, correlation_id: str) -> None:
+        self._notify_action(True)
+        try:
+            self._play_audio(self.countdown_audio_path)
+            self.node.get_logger().info(
+                "10-second countdown completed: "
+                f"correlation_id={correlation_id}"
+            )
+        finally:
+            self._notify_action(False)
+
     def _run_lay_down_and_watch(self, correlation_id: str) -> None:
         self._run_motion_dag(
             "lay_down_and_watch", self.lay_down_action_path, correlation_id
         )
+
+    def _run_support_watch(self, correlation_id: str) -> None:
+        if not self._motion_context_is_safe():
+            raise RuntimeError("seated_countdown rejected by safety context")
+        if not self.lay_down_action_path.is_file():
+            raise FileNotFoundError(self.lay_down_action_path)
+
+        self._notify_action(True)
+        try:
+            request = FunctionInput.Request()
+            request.source = "heikesong"
+            request.dag = self.lay_down_action_path.read_text(encoding="utf-8")
+            request.request_id = correlation_id
+            self._call_service(self.function_client, request, timeout=12.0)
+
+            # SIT_WITHHEAD reaches its stable 10-second seated plateau at 2.5 s.
+            self._spin_for(2.5)
+            self._play_audio(self.countdown_audio_path)
+
+            outcome = self._wait_for_motion_completion(
+                correlation_id, timeout_seconds=25.0
+            )
+            if outcome != "SUCCESS":
+                raise RuntimeError(
+                    f"seated_countdown finished with outcome={outcome}"
+                )
+            self._return_to_fixed_stand(f"{correlation_id}-RECOVERY")
+            self.node.get_logger().info(
+                "seated countdown completed: "
+                f"correlation_id={correlation_id}"
+            )
+        finally:
+            self._notify_action(False)
+
+    def _spin_for(self, duration_seconds: float) -> None:
+        deadline = time.monotonic() + duration_seconds
+        while time.monotonic() < deadline and rclpy.ok():
+            rclpy.spin_once(
+                self.node,
+                timeout_sec=min(0.1, max(0.0, deadline - time.monotonic())),
+            )
+
+    def _run_high_five_left(self, correlation_id: str) -> None:
+        self._run_motion_dag(
+            "high_five_left", self.high_five_left_action_path, correlation_id
+        )
+
+    def _run_high_five_right(self, correlation_id: str) -> None:
+        self._run_motion_dag(
+            "high_five_right", self.high_five_right_action_path, correlation_id
+        )
+
+    def _run_person_orbit(self, correlation_id: str) -> None:
+        if not self._motion_context_is_safe():
+            raise RuntimeError("person_orbit rejected by safety context")
+        self._call_service(self.orbit_start_client, Trigger.Request(), timeout=8.0)
+        deadline = time.monotonic() + 35.0
+        saw_active = False
+        active_states = {"validating_target", "approaching", "orbiting"}
+        while time.monotonic() < deadline:
+            response = self._call_service(
+                self.orbit_status_client, Trigger.Request(), timeout=5.0
+            )
+            status = json.loads(response.message)
+            state = str(status.get("state", ""))
+            if state in active_states:
+                saw_active = True
+            elif state == "completed":
+                self.node.get_logger().info(
+                    f"person orbit completed: correlation_id={correlation_id}"
+                )
+                return
+            elif state in {"aborted", "stopped"}:
+                raise RuntimeError(
+                    f"person orbit {state}: {status.get('reason', 'unknown')}"
+                )
+            elif state == "idle" and saw_active:
+                raise RuntimeError("person orbit returned to idle without outcome")
+            time.sleep(0.20)
+        raise RuntimeError("person orbit status timed out")
+
+    def _finish_v2_mode(self, reason: str) -> None:
+        self.v2.exit_mode()
+        self.v2_pose.reset()
+        self.v2_deadline_s = None
+        self.pending_command = None
+        self.deferred_voice_commands.clear()
+        if self.active_until_s is not None:
+            self.stop(reason)
+        self.node.get_logger().info(f"V2 yoga mode ended: {reason}")
 
     def _run_motion_dag(
         self,
@@ -619,6 +1063,11 @@ class VoicePersonTrackerNode:
         request.dag = self.yoga_action_path.read_text(encoding="utf-8")
         request.request_id = correlation_id
         self._call_service(self.function_client, request, timeout=55.0)
+        outcome = self._wait_for_motion_completion(
+            correlation_id, timeout_seconds=60.0
+        )
+        if outcome != "SUCCESS":
+            raise RuntimeError(f"yoga happy action finished with outcome={outcome}")
 
     def _play_yoga_audio(self) -> None:
         self._play_audio(self.yoga_audio_path)
@@ -808,7 +1257,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--push-up-action-path",
         type=Path,
-        default=Path("/app/config/dags/actions/PUSHUP.json"),
+        default=Path(
+            "/userdata/vbot/.local/share/heikesong/actions/"
+            "PUSHUP_WITHOUT_LATE_HIGHS.json"
+        ),
     )
     parser.add_argument(
         "--lay-down-action-path",
@@ -828,12 +1280,41 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--countdown-audio-path",
+        type=Path,
+        default=Path(
+            "/userdata/vbot/.local/share/heikesong/audio/countdown_10s.wav"
+        ),
+    )
+    parser.add_argument(
         "--command-arm-seconds",
         "--yoga-arm-seconds",
         dest="command_arm_seconds",
         type=float,
         default=10.0,
     )
+    parser.add_argument(
+        "--enable-v2",
+        action="store_true",
+        help="Enable yoga-mode gating and coarse visual task triggers.",
+    )
+    parser.add_argument(
+        "--enable-v2-motion",
+        action="store_true",
+        help="Allow V2 voice and visual tasks to execute robot body actions.",
+    )
+    parser.add_argument(
+        "--high-five-left-action-path",
+        type=Path,
+        default=Path("/app/config/dags/actions/HIGH_FIVE_L.json"),
+    )
+    parser.add_argument(
+        "--high-five-right-action-path",
+        type=Path,
+        default=Path("/app/config/dags/actions/HIGH_FIVE_R.json"),
+    )
+    parser.add_argument("--v2-pose-hold-seconds", type=float, default=1.2)
+    parser.add_argument("--v2-stationary-hold-seconds", type=float, default=5.0)
     parser.add_argument(
         "--one-shot",
         action="store_true",
@@ -855,12 +1336,19 @@ def main() -> int:
         wake_trigger=args.wake_trigger,
         yoga_audio_path=args.yoga_audio_path,
         yoga_wake_audio_path=args.yoga_wake_audio_path,
+        countdown_audio_path=args.countdown_audio_path,
         yoga_action_path=args.yoga_action_path,
         downward_dog_action_path=args.downward_dog_action_path,
         push_up_action_path=args.push_up_action_path,
         lay_down_action_path=args.lay_down_action_path,
         photo_output_path=args.photo_output_path,
         command_arm_seconds=args.command_arm_seconds,
+        enable_v2=args.enable_v2,
+        enable_v2_motion=args.enable_v2_motion,
+        high_five_left_action_path=args.high_five_left_action_path,
+        high_five_right_action_path=args.high_five_right_action_path,
+        v2_pose_hold_seconds=args.v2_pose_hold_seconds,
+        v2_stationary_hold_seconds=args.v2_stationary_hold_seconds,
     )
     try:
         while rclpy.ok():

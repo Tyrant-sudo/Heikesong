@@ -24,3 +24,5 @@
 - 2026-08-28 现场听到通用 Agent 回复“没法陪你做瑜伽动作……”，该结果证明在线 ASR 可用，但属于路由失败，不是 V1 成功反馈。
 - 当前正确入口为“佳佳”后在 10 秒内说注册命令；不再依赖通用 Agent 的自由对话路由。
 - 所有动作必须通过编排层去重，并在失败、超时或停止时禁止后续成功播报。
+- 当前设备的 `vbot` 用户为 `Linger=no` 且没有 sudo，用户级 systemd 会在 SSH 退出时停止。现场改用带 `flock` 和崩溃重启循环的 `run_vbot_voice_person_tracker_supervisor.sh`；已验证 SSH 断开重连后 PID 保持不变。该方案不能跨整机重启，管理员仍需一次性执行 `loginctl enable-linger vbot` 才能恢复 systemd 开机常驻。
+- 正式开机自启改用系统级 `heikesong-voice-person-tracker.service`，安装、状态检查、重启验收和停用步骤见 `VBOT_EDU_VOICE_AUTOSTART.md`。安装后不再并行启动临时 supervisor。

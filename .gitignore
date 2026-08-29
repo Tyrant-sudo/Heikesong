@@ -2,6 +2,7 @@
 /.agents/
 /.codex-tmp/
 /artifacts/
+/pic/
 /tmp_*
 /tmp_models/
 /tmp_vbot_emotions/
@@ -9,6 +10,7 @@
 /precheck_out.log
 /vbot_odometry_monitor.py
 /vbot_workstation_session.json5
+/web/*.zip
 
 # Python
 __pycache__/

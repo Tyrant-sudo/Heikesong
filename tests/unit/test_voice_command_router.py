@@ -53,6 +53,53 @@ class VoiceCommandRouterTests(unittest.TestCase):
         decision = self.router.handle("佳佳", 26.1)
         self.assertEqual("wake_ack", decision.action)
 
+    def test_countdown_aliases_route_to_ten_second_countdown(self) -> None:
+        for index, keyword in enumerate(("倒计时", "十秒倒计时")):
+            now = index * 10.0
+            self.router.handle("佳佳", now)
+            decision = self.router.handle(keyword, now + 1.0)
+            self.assertEqual(
+                ("execute", "countdown_10s"),
+                (decision.action, decision.command),
+            )
+
+    def test_yoga_mode_alias_is_backward_compatible(self) -> None:
+        for index, keyword in enumerate(("瑜伽功能", "瑜伽模式")):
+            now = index * 20.0
+            self.router.handle("佳佳", now)
+            decision = self.router.handle(keyword, now + 1.0)
+            self.assertEqual(("execute", "yoga_start"), (decision.action, decision.command))
+
+    def test_commands_can_skip_wake_inside_active_mode(self) -> None:
+        decision = self.router.handle("下犬式", 10.0, allow_without_wake=True)
+        self.assertEqual(("execute", "downward_dog"), (decision.action, decision.command))
+
+    def test_pose_voice_cooldown_is_short_for_demo_retries(self) -> None:
+        first = self.router.handle("俯卧撑", 10.0, allow_without_wake=True)
+        blocked = self.router.handle("俯卧撑", 14.9, allow_without_wake=True)
+        retried = self.router.handle("俯卧撑", 15.0, allow_without_wake=True)
+        self.assertEqual("execute", first.action)
+        self.assertEqual("ignored", blocked.action)
+        self.assertEqual("execute", retried.action)
+
+    def test_end_command_is_registered(self) -> None:
+        decision = self.router.handle("结束啦", 10.0, allow_without_wake=True)
+        self.assertEqual(("execute", "yoga_end"), (decision.action, decision.command))
+
+    def test_start_countdown_alias_runs_countdown_task(self) -> None:
+        decision = self.router.handle("开始倒数", 10.0, allow_without_wake=True)
+        self.assertEqual(
+            ("execute", "countdown_10s"),
+            (decision.action, decision.command),
+        )
+
+    def test_orbit_command_is_registered(self) -> None:
+        decision = self.router.handle("绕圈", 10.0, allow_without_wake=True)
+        self.assertEqual(
+            ("execute", "person_orbit"),
+            (decision.action, decision.command),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

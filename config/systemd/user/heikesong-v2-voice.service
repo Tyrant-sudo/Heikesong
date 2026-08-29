@@ -1,0 +1,17 @@
+[Unit]
+Description=Heikesong V2 voice commands and person tracking
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /userdata/vbot/.local/share/heikesong/voice_kws/bin/run_vbot_v2_demo.sh
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=15
+Environment=HOME=/userdata/vbot
+Environment=PYTHONUNBUFFERED=1
+Environment=HEIKESONG_V2_ENABLE_MOTION=1
+
+[Install]
+WantedBy=default.target

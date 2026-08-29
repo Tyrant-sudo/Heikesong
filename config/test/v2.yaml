@@ -1,0 +1,61 @@
+version: 2
+
+mode:
+  start_keywords: ["瑜伽功能", "瑜伽模式"]
+  end_keyword: "结束啦"
+  session_timeout_seconds: 1800
+
+visual:
+  source_topic: /perception/poses
+  source_type: vision_msgs/msg/PoseDetection
+  person_score_minimum: 0.55
+  keypoint_confidence_minimum: 0.0
+  pose_hold_seconds: 1.2
+  pose_dropout_grace_seconds: 0.35
+  stationary_hold_seconds: 5.0
+  movement_threshold: 0.025
+  target_lost_seconds: 1.0
+
+tasks:
+  downward_dog:
+    visual: true
+    voice: true
+    action: /userdata/vbot/.local/share/heikesong/actions/DOWNWARD_DOG_ONCE.json
+  push_up:
+    visual: true
+    voice: true
+    action: /userdata/vbot/.local/share/heikesong/actions/PUSHUP_WITHOUT_LATE_HIGHS.json
+  support_watch:
+    visual: true
+    voice_keywords: ["坐下看我", "趴下看我"]
+    action: /app/config/dags/idle/SIT_WITHHEAD.json
+    countdown_seconds: null
+  seated_countdown:
+    visual: false
+    voice_keywords: ["开始倒数", "倒计时", "十秒倒计时"]
+    action: /app/config/dags/idle/SIT_WITHHEAD.json
+    countdown_seconds: 10
+    recovery: FIXED_STAND
+  high_five:
+    voice_trigger: "结束啦"
+    action: /app/config/dags/actions/HIGH_FIVE_R.json
+    exits_yoga_mode: true
+  person_orbit:
+    voice_keywords: ["绕圈"]
+    service: /heikesong/person_orbit/start_auto
+    direction_mode: person_facing
+    manual_service: /heikesong/person_orbit/start
+    ambiguous_facing: reject
+    right_direction: -1
+    left_direction: 1
+    lateral_speed_mps: 0.30
+    base_angular_speed_rps: 0.35
+    angular_speed_limits_rps: [-0.70, 0.70]
+    duration_seconds: 6.8
+
+safety:
+  default_motion_enabled: false
+  single_task_only: true
+  require_static_robot: true
+  require_emergency_stop_clear: true
+  visual_episode_triggers_once: true

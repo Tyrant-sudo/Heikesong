@@ -1,0 +1,18 @@
+[Unit]
+Description=Heikesong person-facing orbit service
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /userdata/vbot/.local/share/heikesong/voice_kws/bin/run_vbot_person_orbit_service.sh
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=15
+Environment=HOME=/userdata/vbot
+Environment=PYTHONUNBUFFERED=1
+Environment=HEIKESONG_ORBIT_DIRECTION=-1
+Environment=HEIKESONG_ORBIT_DURATION_SECONDS=6.8
+
+[Install]
+WantedBy=default.target

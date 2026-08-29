@@ -1,0 +1,16 @@
+[Unit]
+Description=Heikesong person orbit ROS 2 service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vbot
+Environment=HEIKESONG_ORBIT_DIRECTION=-1
+Environment=HEIKESONG_ORBIT_DURATION_SECONDS=6.8
+ExecStart=/userdata/vbot/.local/share/heikesong/voice_kws/bin/run_vbot_person_orbit_service.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

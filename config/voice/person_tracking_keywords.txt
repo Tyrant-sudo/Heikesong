@@ -8,12 +8,20 @@ j ià j ià @佳佳
 j ia j ia @佳佳
 y ú j iā g ōng n éng @瑜伽功能
 y ú j iā @瑜伽功能
-x ià q uǎn sh ì @下犬式
-z uò x ià q uǎn sh ì @下犬式
-f ǔ w ò ch ēng @俯卧撑
-z uò f ǔ w ò ch ēng @俯卧撑
+y ú j iā m ó sh ì @瑜伽模式
+j ié sh ù l a @结束啦
+x ià q uǎn sh ì :2.8 #0.06 @下犬式
+z uò x ià q uǎn sh ì :2.6 #0.07 @下犬式
+x ià q uǎn :3.0 #0.04 @下犬式
+f ǔ w ò ch ēng :2.8 #0.06 @俯卧撑
+z uò f ǔ w ò ch ēng :2.6 #0.07 @俯卧撑
+f ǔ w ò :3.0 #0.04 @俯卧撑
 p ā x ià k àn r én @趴下看人
 p ā x ià k àn w ǒ @趴下看我
 z uò x ià k àn r én @坐下看人
 z uò x ià k àn w ǒ @坐下看我
 p āi zh ào @拍照
+d ào j ì sh í :1.6 #0.12 @倒计时
+sh í m iǎo d ào j ì sh í :1.6 #0.12 @十秒倒计时
+k āi sh ǐ d ào sh ǔ :1.6 #0.12 @开始倒数
+r ào q uān :1.8 #0.12 @绕圈
